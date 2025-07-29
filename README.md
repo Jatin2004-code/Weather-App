@@ -12,7 +12,7 @@ A modern, visually appealing, and intelligent weather dashboard that provides re
 
 | Light Mode | Dark Mode |
 | :---: | :---: |
-| ![Light Mode Screenshot](./Screenshot.png) | ![Dark Mode Screenshot](./Screenshot1.png) |
+| ![Light Mode Screenshot](./Screenshot.jpg) | ![Dark Mode Screenshot](./Screenshot1.jpg) |
 
 ---
 
