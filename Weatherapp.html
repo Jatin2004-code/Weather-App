@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura Weather - AI Dashboard</title>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- LeafletJS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        /* --- Professional Redesign v3 by Gemini --- */
+        :root {
+            --bg-color: #0F0C29;
+            --card-bg: rgba(17, 25, 40, 0.75);
+            --card-border: rgba(255, 255, 255, 0.15);
+            --text-primary: #E0E0E0;
+            --text-secondary: #A0A0A0;
+            --accent-primary: #38BDF8; /* Sky Blue */
+            --accent-secondary: #F472B6; /* Pink */
+            --shadow-color: rgba(0, 0, 0, 0.2);
+            --map-tiles: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+        }
+
+        body.light-mode {
+            --bg-color: #F0F2F5;
+            --card-bg: rgba(255, 255, 255, 0.75);
+            --card-border: rgba(0, 0, 0, 0.1);
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --map-tiles: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            transition: background-image 0.8s ease-in-out, color 0.5s ease, background-color 0.5s ease;
+            overflow-y: auto;
+        }
+
+        /* --- Main Container & Animations --- */
+        .app-container {
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            background-color: var(--card-bg);
+            border-radius: 24px;
+            border: 1px solid var(--card-border);
+            padding: 2rem;
+            max-width: 900px;
+            width: 100%;
+            box-shadow: 0 8px 32px 0 var(--shadow-color);
+            z-index: 1;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in-up {
+            animation: slideIn 0.7s ease-out forwards;
+        }
+
+        /* --- Theme Toggle Button --- */
+        .theme-btn {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .theme-btn:hover {
+            transform: scale(1.1) rotate(15deg);
+            border-color: var(--accent-primary);
+        }
+        .theme-btn svg {
+            width: 22px;
+            height: 22px;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
+        }
+        .theme-btn:hover svg {
+            color: var(--accent-primary);
+        }
+        #moon-icon { display: none; }
+        body.light-mode #sun-icon { display: none; }
+        body.light-mode #moon-icon { display: block; }
+
+
+        /* --- Search & Header --- */
+        .header-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .search-input {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+        .search-input::placeholder {
+            color: var(--text-secondary);
+        }
+        .search-input:focus {
+            background-color: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4);
+            border-color: var(--accent-primary);
+        }
+
+        .search-btn {
+            background: linear-gradient(90deg, var(--accent-primary), #67e8f9);
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.2);
+            transition: all 0.3s ease;
+        }
+        .search-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 7px 20px rgba(56, 189, 248, 0.4);
+        }
+
+        /* --- Weather Display --- */
+        .weather-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid var(--card-border);
+            padding: 1.5rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .weather-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px var(--shadow-color);
+        }
+        
+        #temperature {
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+        
+        #weatherEmoji {
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+
+        /* --- Map Styling --- */
+        #map {
+            height: 100%;
+            min-height: 300px;
+            border-radius: 16px;
+            z-index: 1;
+        }
+        .leaflet-container {
+            border-radius: 16px;
+            background-color: var(--text-secondary);
+        }
+        
+        /* --- AI Description Card --- */
+        .ai-card {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(244, 114, 182, 0.1));
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="app-container">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div class="text-left">
+                <h1 class="header-title">Aura Weather</h1>
+                <p class="text-gray-400 mt-2">AI-powered weather insights.</p>
+            </div>
+            <button id="themeToggleBtn" class="theme-btn" title="Toggle Theme">
+                <svg id="sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.106a.75.75 0 010 1.06l-1.591 1.59a.75.75 0 11-1.06-1.06l1.59-1.59a.75.75 0 011.06 0zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5h2.25a.75.75 0 01.75.75zM17.836 17.836a.75.75 0 01-1.06 0l-1.59-1.591a.75.75 0 111.06-1.06l1.591 1.59a.75.75 0 010 1.061zM12 18.75a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0v-2.25a.75.75 0 01.75-.75zM6.106 17.836a.75.75 0 010-1.06l1.59-1.591a.75.75 0 111.06 1.06l-1.59 1.59a.75.75 0 01-1.06 0zM3 12a.75.75 0 01.75-.75h2.25a.75.75 0 010 1.5H3.75A.75.75 0 013 12zM6.164 6.164a.75.75 0 011.06 0l1.591 1.59a.75.75 0 01-1.06 1.06L6.164 7.224a.75.75 0 010-1.06z"></path></svg>
+                <svg id="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M9.528 1.718a.75.75 0 01.162.819A8.97 8.97 0 009 6a9 9 0 009 9 8.97 8.97 0 003.463-.69a.75.75 0 01.981.981A10.503 10.503 0 0118 18a10.5 10.5 0 01-10.5-10.5c0-1.81.46-3.516 1.255-5.042a.75.75 0 01.819-.162z" clip-rule="evenodd"></path></svg>
+            </button>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="flex flex-col sm:flex-row gap-3 mb-8">
+            <input type="text" id="cityInput" placeholder="Enter city name (e.g., London)" class="search-input w-full px-5 py-3 rounded-lg focus:outline-none">
+            <button id="searchBtn" class="search-btn w-full sm:w-auto px-8 py-3 rounded-lg font-semibold text-white flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
+                <span>Search</span>
+            </button>
+        </div>
+
+        <!-- Weather Result Section -->
+        <div id="weatherResult" class="hidden space-y-6">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="weather-card flex flex-col justify-between text-center fade-in-up">
+                    <div>
+                        <h2 id="cityName" class="text-3xl font-bold"></h2>
+                        <p id="weatherDescription" class="text-xl text-sky-300 capitalize mt-1"></p>
+                    </div>
+                    <div class="my-4">
+                        <div id="weatherEmoji" class="text-7xl"></div>
+                        <p id="temperature" class="text-6xl"></p>
+                    </div>
+                    <div class="flex justify-around w-full text-center border-t border-[var(--card-border)] pt-4">
+                        <div>
+                            <span class="text-sm text-gray-400">Humidity</span>
+                            <p id="humidity" class="text-xl font-semibold"></p>
+                        </div>
+                        <div>
+                            <span class="text-sm text-gray-400">Wind Speed</span>
+                            <p id="windSpeed" class="text-xl font-semibold"></p>
+                        </div>
+                    </div>
+                </div>
+                <div id="map" class="weather-card p-0 overflow-hidden fade-in-up" style="animation-delay: 0.2s;"></div>
+            </div>
+
+            <div class="weather-card ai-card fade-in-up" style="animation-delay: 0.4s;">
+                <h3 class="text-xl font-semibold mb-3 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-sky-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                    <span>AI-Generated Vibe</span>
+                </h3>
+                <p id="aiDescription" class="text-gray-200 leading-relaxed min-h-[50px]"></p>
+                <div id="loader" class="hidden flex items-center justify-center p-4">
+                    <div class="w-6 h-6 border-4 border-dashed rounded-full animate-spin border-sky-400"></div>
+                    <p class="ml-3 text-gray-300">AI is crafting the vibe...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="error-message" class="hidden text-center bg-red-500/20 border border-red-500 text-red-300 p-4 rounded-lg mt-6"></div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const weatherApiKey = "f84a721510a77fb91106b98148ac7a68";
+        const geminiApiKey = ""; // Provided by Canvas environment
+
+        // --- DOM ELEMENTS ---
+        const cityInput = document.getElementById('cityInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const weatherResult = document.getElementById('weatherResult');
+        const cityNameEl = document.getElementById('cityName');
+        const temperatureEl = document.getElementById('temperature');
+        const weatherDescriptionEl = document.getElementById('weatherDescription');
+        const weatherEmojiEl = document.getElementById('weatherEmoji');
+        const humidityEl = document.getElementById('humidity');
+        const windSpeedEl = document.getElementById('windSpeed');
+        const aiDescriptionEl = document.getElementById('aiDescription');
+        const loader = document.getElementById('loader');
+        const errorMessageEl = document.getElementById('error-message');
+
+        let map;
+        let currentMapTiles = 'dark';
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-mode');
+            }
+            currentMapTiles = savedTheme;
+            getWeather("Tokyo");
+        });
+
+        // --- EVENT LISTENERS ---
+        searchBtn.addEventListener('click', handleSearch);
+        cityInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') handleSearch();
+        });
+        themeToggleBtn.addEventListener('click', toggleTheme);
+
+        // --- FUNCTIONS ---
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            const newTheme = document.body.classList.contains('light-mode') ? 'light' : 'dark';
+            localStorage.setItem('theme', newTheme);
+            currentMapTiles = newTheme;
+            
+            if (map) {
+                const center = map.getCenter();
+                const zoom = map.getZoom();
+                map.remove();
+                initializeMap(center.lat, center.lng, zoom);
+            }
+        }
+
+        function handleSearch() {
+            const city = cityInput.value.trim();
+            if (city) getWeather(city);
+            else showError("Please enter a city name.");
+        }
+
+        async function getWeather(city) {
+            errorMessageEl.classList.add('hidden');
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = 'Searching...';
+
+            const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${weatherApiKey}&units=metric&lang=en`;
+
+            try {
+                const response = await fetch(weatherUrl);
+                if (!response.ok) throw new Error('City not found. Please check the name.');
+                const data = await response.json();
+                updateWeatherUI(data);
+                generateAIDescription(data);
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg><span>Search</span>';
+            }
+        }
+
+        function updateWeatherUI(data) {
+            cityNameEl.textContent = data.name;
+            temperatureEl.innerHTML = `${Math.round(data.main.temp)}&deg;C`;
+            weatherDescriptionEl.textContent = data.weather[0].description;
+            weatherEmojiEl.textContent = getWeatherEmoji(data.weather[0].id);
+            humidityEl.textContent = `${data.main.humidity}%`;
+            windSpeedEl.textContent = `${data.wind.speed} m/s`;
+            
+            weatherResult.classList.remove('hidden');
+            updateDynamicBackground(data.weather[0].main);
+            
+            if (map) {
+                map.setView([data.coord.lat, data.coord.lon], 12);
+                map.eachLayer((layer) => {
+                    if (layer instanceof L.Marker) map.removeLayer(layer);
+                });
+                L.marker([data.coord.lat, data.coord.lon]).addTo(map).bindPopup(`<b>${data.name}</b>`).openPopup();
+            } else {
+                initializeMap(data.coord.lat, data.coord.lon, 12, data.name);
+            }
+        }
+
+        function initializeMap(lat, lon, zoom, cityName) {
+            const lightTiles = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+            const darkTiles = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+            const tileUrl = currentMapTiles === 'light' ? lightTiles : darkTiles;
+
+            map = L.map('map').setView([lat, lon], zoom);
+            L.tileLayer(tileUrl, {
+                attribution: '&copy; CARTO & &copy; OpenStreetMap contributors',
+                maxZoom: 20
+            }).addTo(map);
+
+            if(cityName) {
+                 L.marker([lat, lon]).addTo(map).bindPopup(`<b>${cityName}</b>`).openPopup();
+            }
+        }
+
+        function updateDynamicBackground(weatherMain) {
+            let imageUrl = '';
+            switch (weatherMain) {
+                case 'Clear': imageUrl = 'https://images.unsplash.com/photo-1590077428593-a55d22756b70?q=80&w=2574&auto=format&fit=crop'; break;
+                case 'Clouds': imageUrl = 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?q=80&w=2551&auto=format&fit=crop'; break;
+                case 'Rain': case 'Drizzle': imageUrl = 'https://images.unsplash.com/photo-1515694346937-94d85e41e620?q=80&w=2564&auto=format&fit=crop'; break;
+                case 'Thunderstorm': imageUrl = 'https://images.unsplash.com/photo-1605727226352-8d949d8c14a2?q=80&w=2574&auto=format&fit=crop'; break;
+                case 'Snow': imageUrl = 'https://images.unsplash.com/photo-1547754980-3df97fed72a8?q=80&w=2574&auto=format&fit=crop'; break;
+                case 'Mist': case 'Fog': case 'Haze': imageUrl = 'https://images.unsplash.com/photo-1482841628122-d096d4c45533?q=80&w=2574&auto=format&fit=crop'; break;
+                default: imageUrl = 'https://images.unsplash.com/photo-1444703686981-a3abbc4d42e2?q=80&w=2670&auto=format&fit=crop';
+            }
+            document.body.style.backgroundImage = `url('${imageUrl}')`;
+        }
+
+        function getWeatherEmoji(weatherId) {
+            if (weatherId >= 200 && weatherId < 300) return '⛈️';
+            if (weatherId >= 300 && weatherId < 400) return '🌦️';
+            if (weatherId >= 500 && weatherId < 600) return '🌧️';
+            if (weatherId >= 600 && weatherId < 700) return '❄️';
+            if (weatherId >= 700 && weatherId < 800) return '🌫️';
+            if (weatherId === 800) return '☀️';
+            if (weatherId === 801) return '🌤️';
+            if (weatherId === 802) return '🌥️';
+            if (weatherId > 802) return '☁️';
+            return '🌍';
+        }
+        
+        async function generateAIDescription(weatherData) {
+            aiDescriptionEl.textContent = "";
+            loader.classList.remove('hidden');
+
+            // FIX: Simplified and more robust prompt in Hindi (Latin script)
+            const prompt = `Aap ek mausam ke kavi hain. Is sheher ka mahaul kaisa hai: ${weatherData.name}. Abhi ka mausam hai: ${weatherData.weather[0].description} aur taapmaan ${Math.round(weatherData.main.temp)}°C hai. Iske baare mein 2 line mein, aasan Hindi (Latin script) mein likhein.`;
+
+            try {
+                const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+                const payload = { contents: chatHistory };
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const errorBody = await response.json();
+                    console.error("AI API Error:", errorBody);
+                    throw new Error('Could not generate AI description due to a server error.');
+                }
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts[0].text) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    aiDescriptionEl.textContent = text;
+                } else {
+                    // Handle cases where the API returns a valid response but no text (e.g., safety filters)
+                    console.warn("AI response was valid but contained no text.", result);
+                    throw new Error('AI could not generate a description for this weather.');
+                }
+            } catch (error) {
+                console.error("AI Description Error:", error);
+                aiDescriptionEl.textContent = "Could not retrieve the atmospheric vibe at the moment.";
+            } finally {
+                loader.classList.add('hidden');
+            }
+        }
+
+        function showError(message) {
+            errorMessageEl.textContent = message;
+            errorMessageEl.classList.remove('hidden');
+        }
+
+    </script>
+</body>
+</html>
