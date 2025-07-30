@@ -2,7 +2,7 @@
 
 A modern, visually appealing, and intelligent weather dashboard that provides real-time weather data, detailed forecasts, and an interactive map powered by AI-driven insights.
 
-**[Live Demo Link Here]** 👈 *(Add your live project link once deployed)*
+**[Live Demo Link Here]** https://jatin2004-code.github.io/Weather-App/
 
 ---
 
